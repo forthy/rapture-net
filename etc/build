@@ -1,0 +1,4 @@
+#!/bin/sh
+mkdir -p bin && \
+scalac -feature -deprecation -cp ../time/time.jar:../crypto/crypto.jar:../json/json.jar:../io/io.jar:../core/core.jar -d bin src/*.scala && \
+jar cmf etc/manifest net.jar -C bin rapture
