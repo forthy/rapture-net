@@ -21,23 +21,25 @@
 package rapture
 import rapture.io._
 import rapture.core._
-import rapture.json._
 
 import java.io._
 
 package object net {
   
   type TcpService = Services.Tcp.Item
-  implicit object HttpQueryParametersMap extends HttpQueryParametersBase[(Symbol, String), Map[Symbol, String]]
+  
+  implicit val httpQueryParametersMap: HttpQueryParametersBase[(Symbol, String), Map[Symbol,
+      String]] = new HttpQueryParametersBase[(Symbol, String), Map[Symbol, String]]
 
-  implicit object HttpQueryParametersIter extends HttpQueryParametersBase[(Symbol, String), Seq[(Symbol, String)]]
+  implicit val HttpQueryParametersIter: HttpQueryParametersBase[(Symbol, String), Seq[(Symbol,
+      String)]] = new HttpQueryParametersBase[(Symbol, String), Seq[(Symbol, String)]]
 
-  implicit object PageIdentifier extends QueryType[Path[_], Symbol] {
+  implicit val pageIdentifier: QueryType[Path[_], Symbol] = new QueryType[Path[_], Symbol] {
     def extras(existing: AfterPath, q: Symbol): AfterPath =
       existing + ('#' -> (q.name -> 2.0))
   }
 
-  implicit object HttpUrlLinkable extends Linkable[HttpUrl, HttpUrl] {
+  implicit val httpUrlLinkable: Linkable[HttpUrl, HttpUrl] = new Linkable[HttpUrl, HttpUrl] {
     type Result = Link
     def link(src: HttpUrl, dest: HttpUrl) = {
       if(src.ssl == dest.ssl && src.hostname == dest.hostname && src.port == dest.port) {
@@ -47,51 +49,54 @@ package object net {
     }
   }
 
-  implicit val FormPostType = new PostType[Map[Symbol, String]] {
+  implicit val formPostType: PostType[Map[Symbol, String]] = new PostType[Map[Symbol, String]] {
     def contentType = Some(MimeTypes.`application/x-www-form-urlencoded`)
     def sender(content: Map[Symbol, String]) = ByteArrayInput((content map { case (k, v) =>
       java.net.URLEncoder.encode(k.name, "UTF-8")+"="+java.net.URLEncoder.encode(v, "UTF-8")
     } mkString "&").getBytes("UTF-8"))
   }
 
-  implicit val StringPostType = new PostType[String] {
+  implicit val stringPostType: PostType[String] = new PostType[String] {
     def contentType = Some(MimeTypes.`text/plain`)
     def sender(content: String) = ByteArrayInput(content.getBytes("UTF-8"))
   }
 
-  implicit val NonePostType = new PostType[None.type] {
+  implicit val nonePostType: PostType[None.type] = new PostType[None.type] {
     def contentType = Some(MimeTypes.`application/x-www-form-urlencoded`)
     def sender(content: None.type) = ByteArrayInput(Array[Byte](0))
   }
 
-  implicit val JsonPostType = new PostType[Json] {
+  /*implicit val JsonPostType = new PostType[Json] {
     def contentType = Some(MimeTypes.`application/x-www-form-urlencoded`)
     def sender(content: Json) =
       ByteArrayInput(content.toString.getBytes("UTF-8"))
-  }
+  }*/
   
   /** Type class object for reading `Byte`s from `HttpUrl`s */
-  implicit object HttpStreamByteReader extends JavaInputStreamReader[HttpUrl](
-      _.javaConnection.getInputStream)
+  implicit val httpStreamByteReader: JavaInputStreamReader[HttpUrl] =
+      new JavaInputStreamReader[HttpUrl](_.javaConnection.getInputStream)
 
-  implicit object HttpResponseCharReader extends StreamReader[HttpResponse, Char] {
-    def input(response: HttpResponse)(implicit eh: ExceptionHandler): eh.![Exception, Input[Char]] =
-      eh.except {
-        implicit val enc = Encodings.`UTF-8`
-        implicit val errorHandler = raw
-        response.input[Char]
-      }
+  implicit val httpResponseCharReader: StreamReader[HttpResponse, Char] =
+      new StreamReader[HttpResponse, Char] {
+    def input(response: HttpResponse)(implicit eh: ExceptionHandler):
+        eh.![Exception, Input[Char]] = eh.except {
+      implicit val enc = Encodings.`UTF-8`
+      implicit val errorHandler = raw
+      response.input[Char]
+    }
   }
 
-  implicit object HttpResponseByteReader extends StreamReader[HttpResponse, Byte] {
-    def input(response: HttpResponse)(implicit eh: ExceptionHandler): eh.![Exception, Input[Byte]] =
-      eh.except(response.input[Byte](implicitly[InputBuilder[InputStream, Byte]], raw))
-  }
+  implicit val httpResponseByteReader: StreamReader[HttpResponse, Byte] =
+    new StreamReader[HttpResponse, Byte] {
+      def input(response: HttpResponse)(implicit eh: ExceptionHandler):
+          eh.![Exception, Input[Byte]] =
+        eh.except(response.input[Byte](implicitly[InputBuilder[InputStream, Byte]], raw))
+    }
 
-  implicit object SocketStreamByteReader extends
-      JavaInputStreamReader[SocketUri](_.javaSocket.getInputStream)
+  implicit val socketStreamByteReader: JavaInputStreamReader[SocketUri] =
+    new JavaInputStreamReader[SocketUri](_.javaSocket.getInputStream)
 
-  implicit object SocketStreamByteWriter extends
-      JavaOutputStreamWriter[SocketUri](_.javaSocket.getOutputStream)
+  implicit val socketStreamByteWriter: JavaOutputStreamWriter[SocketUri] =
+    new JavaOutputStreamWriter[SocketUri](_.javaSocket.getOutputStream)
 }
 

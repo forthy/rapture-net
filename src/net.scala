@@ -22,7 +22,6 @@ package rapture.net
 
 import rapture.io._
 import rapture.core._
-import rapture.json._
 import rapture.crypto._
 
 import language.existentials
@@ -190,7 +189,7 @@ trait NetUrl extends Url[NetUrl] with Uri {
 class HttpQueryParametersBase[U, T <: Iterable[U]] extends QueryType[Path[_], T] {
   def extras(existing: AfterPath, q: T): AfterPath =
     existing + ('?' -> ((q.map({ case (k: Symbol, v: String) =>
-      urlCodec(k.name).urlEncode+"="+urlCodec(v).urlEncode
+      k.name.urlEncode+"="+v.urlEncode
     }).mkString("&")) -> 1.0))
 }
 
