@@ -59,8 +59,8 @@ object HttpMethods {
 
 class HttpResponse(val headers: Map[String, List[String]], val status: Int, is: InputStream) {
   def input[Data](implicit ib: InputBuilder[InputStream, Data], eh: ExceptionHandler):
-      eh.![Exception, Input[Data]]=
-    eh.except(ib.input(is)(raw))
+      eh.![Input[Data], Exception]=
+    eh.wrap(ib.input(is)(raw))
 }
 
 trait PostType[-C] {
@@ -113,13 +113,13 @@ trait NetUrl extends Url[NetUrl] with Uri {
     * @return the HTTP response from the remote host */
   def put[C: PostType](content: C, authenticate: Option[(String, String)] = None,
       ignoreInvalidCertificates: Boolean = false, httpHeaders: Map[String, String] =
-      Map(), followRedirects: Boolean = true)(implicit eh: ExceptionHandler): eh.![HttpExceptions, HttpResponse] =
+      Map(), followRedirects: Boolean = true)(implicit eh: ExceptionHandler): eh.![HttpResponse, HttpExceptions] =
     post(content, authenticate, ignoreInvalidCertificates, httpHeaders, "PUT", followRedirects)(
         implicitly[PostType[C]], eh)
 
   def get(authenticate: Option[(String, String)] = None, ignoreInvalidCertificates: Boolean =
       false, httpHeaders: Map[String, String] = Map(), followRedirects: Boolean = true)(implicit eh: ExceptionHandler):
-      eh.![HttpExceptions, HttpResponse] = post(None, authenticate, ignoreInvalidCertificates,
+      eh.![HttpResponse, HttpExceptions] = post(None, authenticate, ignoreInvalidCertificates,
       httpHeaders, "GET", followRedirects)(implicitly[PostType[None.type]], eh)
       
 
@@ -132,7 +132,7 @@ trait NetUrl extends Url[NetUrl] with Uri {
   def post[C: PostType](content: C, authenticate: Option[(String, String)] = None,
       ignoreInvalidCertificates: Boolean = false, httpHeaders: Map[String, String] = Map(),
       method: String = "POST", followRedirects: Boolean = true)(implicit eh: ExceptionHandler):
-      eh.![HttpExceptions, HttpResponse] = eh.except {
+      eh.![HttpResponse, HttpExceptions] = eh.wrap {
     
     implicit val errorHandler = raw
 
@@ -243,8 +243,8 @@ object Http extends Scheme[HttpUrl] {
   private val UrlRegex = """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?\/?(.*)""".r
 
   /** Parses a URL string into an HttpUrl */
-  def parse(s: String)(implicit eh: ExceptionHandler): eh.![ParseException, HttpUrl] =
-      eh.except { s match {
+  def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
+      eh.wrap { s match {
     case UrlRegex(scheme, server, port, path) =>
       val rp = new SimplePath(path.split("/"), Map())
       scheme match {

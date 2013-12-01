@@ -72,7 +72,7 @@ class Browser {
     def get(authenticate: Option[(String, String)] = None) = url.get(authenticate)
     def post[C: PostType](content: C, authenticate: Option[(String, String)] = None,
         httpHeaders: Map[String, String] = Map())(implicit eh: ExceptionHandler):
-        eh.![HttpExceptions, HttpResponse] = eh.except {
+        eh.![HttpResponse, HttpExceptions] = eh.wrap {
       
       var u = url
       var retries = 0

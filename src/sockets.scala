@@ -32,7 +32,7 @@ object Tcp {
     * @param port the port to listen to */
   def listen[K](port: Int)(implicit ib: InputBuilder[InputStream, K],
       ob: OutputBuilder[OutputStream, K], eh: ExceptionHandler):
-      eh.![Exception, (Input[K], Output[K])] = eh.except {
+      eh.![(Input[K], Output[K]), Exception] = eh.wrap {
     val sock = new java.net.ServerSocket(port)
     val sock2 = sock.accept()
     (ib.input(sock2.getInputStream)(raw), ob.output(sock2.getOutputStream)(raw))
