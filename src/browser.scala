@@ -27,19 +27,21 @@ import scala.collection.mutable.HashMap
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class Browser()(implicit val ts: TimeSystem) {
+case class Cookie[I: TimeSystem](domain: String, name: String, value: String, path: SimplePath,
+    expiry: Option[I], secure: Boolean) {
+  lazy val pathString = path.toString
+}
+
+class Browser[I: TimeSystem]() {
   val browserString = "Rapture I/O Browser 0.9.0"
   private val Rfc1036Pattern = "EEE, dd-MMM-yyyy HH:mm:ss zzz"
 
-  case class Cookie(domain: String, name: String, value: String, path: SimplePath,
-      expiry: Option[ts.Instant], secure: Boolean) {
-    lazy val pathString = path.toString
-  }
+  val ts = implicitly[TimeSystem[I]]
 
-  val cookies: HashMap[(String, String, SimplePath), Cookie] =
-    new HashMap[(String, String, SimplePath), Cookie]
+  val cookies: HashMap[(String, String, SimplePath), Cookie[I]] =
+    new HashMap[(String, String, SimplePath), Cookie[I]]
 
-  def parseCookie(s: String, domain: String): Cookie = {
+  def parseCookie(s: String, domain: String): Cookie[I] = {
     val ps = s.split(";").map(_.trim.split("=")) map { a =>
       a(0).toLowerCase -> (if(a.length > 1) a(1).urlDecode else "")
     }
@@ -64,7 +66,7 @@ class Browser()(implicit val ts: TimeSystem) {
         c._1+"="+c._2.maxBy(_.pathString.length).value.urlEncode } mkString "; "
   }
 
-  def accept(c: Cookie): Boolean = c.domain.split("\\.").length > 1
+  def accept[I](c: Cookie[I]): Boolean = c.domain.split("\\.").length > 1
 
   class BrowserUrl(url: HttpUrl) {
     protected implicit val errorHandler = raw
