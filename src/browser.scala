@@ -6,7 +6,7 @@
 *                                                                                              *
 *   http://rapture.io/                                                                         *
 *                                                                                              *
-* Copyright 2010-2013 Propensive Ltd.                                                          *
+* Copyright 2010-2014 Jon Pretty, Propensive Ltd.                                              *
 *                                                                                              *
 * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file    *
 * except in compliance with the License. You may obtain a copy of the License at               *
@@ -21,27 +21,28 @@
 package rapture.net
 import rapture.core._
 import rapture.io._
+import rapture.uri._
 
 import scala.xml._
 import scala.collection.mutable.HashMap
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-case class Cookie[I: TimeSystem](domain: String, name: String, value: String, path: SimplePath,
-    expiry: Option[I], secure: Boolean) {
+case class Cookie[I, D](domain: String, name: String, value: String,
+    path: SimplePath, expiry: Option[I], secure: Boolean)(implicit ts: TimeSystem[I, D]) {
   lazy val pathString = path.toString
 }
 
-class Browser[I: TimeSystem]() {
-  val browserString = "Rapture I/O Browser 0.9.0"
+class Browser[I: TimeSystem.ByInstant]() {
+  val browserString = "Rapture Net Browser 0.9.0"
   private val Rfc1036Pattern = "EEE, dd-MMM-yyyy HH:mm:ss zzz"
 
-  val ts = implicitly[TimeSystem[I]]
+  val ts = ?[TimeSystem.ByInstant[I]]
 
-  val cookies: HashMap[(String, String, SimplePath), Cookie[I]] =
-    new HashMap[(String, String, SimplePath), Cookie[I]]
+  val cookies: HashMap[(String, String, SimplePath), Cookie[I, _]] =
+    new HashMap[(String, String, SimplePath), Cookie[I, _]]
 
-  def parseCookie(s: String, domain: String): Cookie[I] = {
+  def parseCookie(s: String, domain: String): Cookie[I, _] = {
     val ps = s.split(";").map(_.trim.split("=")) map { a =>
       a(0).toLowerCase -> (if(a.length > 1) a(1).urlDecode else "")
     }
@@ -66,43 +67,52 @@ class Browser[I: TimeSystem]() {
         c._1+"="+c._2.maxBy(_.pathString.length).value.urlEncode } mkString "; "
   }
 
-  def accept[I](c: Cookie[I]): Boolean = c.domain.split("\\.").length > 1
+  def accept[I, D](c: Cookie[I, D]): Boolean = c.domain.split("\\.").length > 1
 
   class BrowserUrl(url: HttpUrl) {
+
     protected implicit val errorHandler = raw
-    def get(authenticate: Option[(String, String)] = None) = url.get(authenticate)
-    def post[C: PostType](content: C, authenticate: Option[(String, String)] = None,
-        httpHeaders: Map[String, String] = Map())(implicit eh: ExceptionHandler):
-        eh.![HttpResponse, HttpExceptions] = eh.wrap {
-      
-      var u = url
-      var retries = 0
-      var response: HttpResponse = null
 
-      do {
-        response = u.post[C](content, authenticate, true,
-            httpHeaders + ("Cookie" -> domainCookies(u.hostname, u.ssl, u.pathString)),
-            followRedirects = false)
+    def get[I, D](
+      timeout: D = null,
+      authenticate: Option[(String, String)] = None)
+    (implicit ts: TimeSystem[I, D]) = url.get(timeout, authenticate)
+    
+    def post[C: PostType, D](
+      content: C, timeout: D = null,
+      authenticate: Option[(String, String)] = None,
+      httpHeaders: Map[String, String] = Map())
+    (implicit eh: ExceptionHandler, ts: TimeSystem[I, D]): eh.![HttpResponse, HttpExceptions] =
+      eh.wrap {
+        
+        var u = url
+        var retries = 0
+        var response: HttpResponse = null
 
-        val newCookies = response.headers.get("Set-Cookie").getOrElse(Nil) map { c =>
-          parseCookie(c, u.hostname)
-        } filter accept
-      
-        for(c <- newCookies) cookies((c.domain, c.name, c.path)) = c
+        do {
+          response = u.post[C, D](content, timeout, authenticate, true,
+              httpHeaders + ("Cookie" -> domainCookies(u.hostname, u.ssl, u.pathString)),
+              followRedirects = false)
 
-        if(response.status/100 == 3) {
-          retries += 1
-          if(retries > 5) throw TooManyRedirects()
-          val dest = response.headers("Location").headOption.getOrElse(throw BadHttpResponse())
+          val newCookies = response.headers.get("Set-Cookie").getOrElse(Nil) map { c =>
+            parseCookie(c, u.hostname)
+          } filter { c: Cookie[I, _] => accept(c) }
+        
+          for(c <- newCookies) cookies((c.domain, c.name, c.path)) = c
 
-          u = if(dest.startsWith("http")) Http.parse(dest)
-              else if(dest.startsWith("/")) Http / u.hostname / SimplePath.parse(dest)
-              // FIXME: This doesn't handle ascent in relative paths
-              else u / SimplePath.parse(dest)
-        }
-      } while(response.status/100 == 3)
-      
-      response
+          if(response.status/100 == 3) {
+            retries += 1
+            if(retries > 5) throw TooManyRedirects()
+            val dest = response.headers("Location").headOption.getOrElse(throw BadHttpResponse())
+
+            u = if(dest.startsWith("http")) Http.parse(dest)
+                else if(dest.startsWith("/")) Http / u.hostname / SimplePath.parse(dest)
+                // FIXME: This doesn't handle ascent in relative paths
+                else u / SimplePath.parse(dest)
+          }
+        } while(response.status/100 == 3)
+        
+        response
     }
   }
 

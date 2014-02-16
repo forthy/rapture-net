@@ -6,7 +6,7 @@
 *                                                                                              *
 *   http://rapture.io/                                                                         *
 *                                                                                              *
-* Copyright 2010-2013 Propensive Ltd.                                                          *
+* Copyright 2010-2014 Jon Pretty, Propensive Ltd.                                              *
 *                                                                                              *
 * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file    *
 * except in compliance with the License. You may obtain a copy of the License at               *
@@ -20,6 +20,8 @@
 \**********************************************************************************************/
 package rapture
 import rapture.io._
+import rapture.uri._
+import rapture.mime._
 import rapture.core._
 
 import java.io._
@@ -90,7 +92,7 @@ package object net {
     new StreamReader[HttpResponse, Byte] {
       def input(response: HttpResponse)(implicit eh: ExceptionHandler):
           eh.![Input[Byte], Exception] =
-        eh.wrap(response.input[Byte](implicitly[InputBuilder[InputStream, Byte]], raw))
+        eh.wrap(response.input[Byte](?[InputBuilder[InputStream, Byte]], raw))
     }
 
   implicit val socketStreamByteReader: JavaInputStreamReader[SocketUri] =

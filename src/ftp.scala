@@ -6,7 +6,7 @@
 *                                                                                              *
 *   http://rapture.io/                                                                         *
 *                                                                                              *
-* Copyright 2010-2013 Propensive Ltd.                                                          *
+* Copyright 2010-2014 Jon Pretty, Propensive Ltd.                                              *
 *                                                                                              *
 * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file    *
 * except in compliance with the License. You may obtain a copy of the License at               *
@@ -21,6 +21,7 @@
 package rapture.net
 import rapture.core._
 import rapture.io._
+import rapture.uri._
 
 object Ftp extends Scheme[FtpUrl] {
   def schemeName = "ftp"

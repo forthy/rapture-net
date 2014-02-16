@@ -6,7 +6,7 @@
 *                                                                                              *
 *   http://rapture.io/                                                                         *
 *                                                                                              *
-* Copyright 2010-2013 Propensive Ltd.                                                          *
+* Copyright 2010-2014 Jon Pretty, Propensive Ltd.                                              *
 *                                                                                              *
 * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file    *
 * except in compliance with the License. You may obtain a copy of the License at               *
@@ -21,6 +21,8 @@
 package rapture.net
 
 import rapture.io._
+import rapture.uri._
+import rapture.mime._
 import rapture.core._
 import rapture.crypto._
 
@@ -111,16 +113,34 @@ trait NetUrl extends Url[NetUrl] with Uri {
     * @param authenticate the username and password to provide for basic HTTP authentication,
     *        defaulting to no authentication.
     * @return the HTTP response from the remote host */
-  def put[C: PostType](content: C, authenticate: Option[(String, String)] = None,
-      ignoreInvalidCertificates: Boolean = false, httpHeaders: Map[String, String] =
-      Map(), followRedirects: Boolean = true)(implicit eh: ExceptionHandler): eh.![HttpResponse, HttpExceptions] =
-    post(content, authenticate, ignoreInvalidCertificates, httpHeaders, "PUT", followRedirects)(
-        implicitly[PostType[C]], eh)
+  def put[C: PostType, T](
+    content: C,
+    timeout: T = null,
+    authenticate: Option[(String, String)] = None,
+    ignoreInvalidCertificates: Boolean = false,
+    httpHeaders: Map[String, String] = Map(),
+    followRedirects: Boolean = true)
+  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+    
+    val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
+    
+    post(content, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "PUT",
+        followRedirects)(?[PostType[C]], eh, ts)
+  }
 
-  def get(authenticate: Option[(String, String)] = None, ignoreInvalidCertificates: Boolean =
-      false, httpHeaders: Map[String, String] = Map(), followRedirects: Boolean = true)(implicit eh: ExceptionHandler):
-      eh.![HttpResponse, HttpExceptions] = post(None, authenticate, ignoreInvalidCertificates,
-      httpHeaders, "GET", followRedirects)(implicitly[PostType[None.type]], eh)
+  def get[T](
+    timeout: T = null,
+    authenticate: Option[(String, String)] = None,
+    ignoreInvalidCertificates: Boolean = false,
+    httpHeaders: Map[String, String] = Map(),
+    followRedirects: Boolean = true)
+  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+
+    val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
+    
+    post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "GET",
+        followRedirects)(?[PostType[None.type]], eh, ts)
+  }
       
 
   /** Sends an HTTP post to this URL.
@@ -129,61 +149,70 @@ trait NetUrl extends Url[NetUrl] with Uri {
     * @param authenticate the username and password to provide for basic HTTP authentication,
     *        defaulting to no authentication.
     * @return the HTTP response from the remote host */
-  def post[C: PostType](content: C, authenticate: Option[(String, String)] = None,
-      ignoreInvalidCertificates: Boolean = false, httpHeaders: Map[String, String] = Map(),
-      method: String = "POST", followRedirects: Boolean = true)(implicit eh: ExceptionHandler):
-      eh.![HttpResponse, HttpExceptions] = eh.wrap {
-    
-    implicit val errorHandler = raw
+  def post[C: PostType, T](
+    content: C,
+    timeout: T = null,
+    authenticate: Option[(String, String)] = None,
+    ignoreInvalidCertificates: Boolean = false,
+    httpHeaders: Map[String, String] = Map(),
+    method: String = "POST",
+    followRedirects: Boolean = true)
+  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] =
+    eh.wrap {
+      val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
+      implicit val errorHandler = raw
 
-    // FIXME: This will produce a race condition if creating multiple URL connections with
-    // different values for followRedirects in parallel
-    HttpURLConnection.setFollowRedirects(followRedirects)
-    val conn: URLConnection = new URL(toString).openConnection()
-    conn match {
-      case c: HttpsURLConnection =>
-        if(ignoreInvalidCertificates) {
-          c.setSSLSocketFactory(sslContext.getSocketFactory)
-          c.setHostnameVerifier(allHostsValid)
-        }
-        c.setRequestMethod(method)
-        if(content != None) c.setDoOutput(true)
-        c.setUseCaches(false)
-      case c: HttpURLConnection =>
-        c.setRequestMethod(method)
-        if(content != None) c.setDoOutput(true)
-        c.setUseCaches(false)
-    }
-
-    if(authenticate.isDefined) conn.setRequestProperty("Authorization",
-        "Basic "+base64.encode((authenticate.get._1+":"+authenticate.get._2).getBytes("UTF-8")).mkString)
-
-    implicitly[PostType[C]].contentType map { ct =>
-      conn.setRequestProperty("Content-Type", ct.name)
-    }
-    for((k, v) <- httpHeaders) conn.setRequestProperty(k, v)
-
-    if(content != None)
-      ensuring(OutputStreamBuilder.output(conn.getOutputStream)) { out =>
-        implicitly[PostType[C]].sender(content) > out
-      } (_.close())
-
-    import scala.collection.JavaConversions._
-
-    val statusCode = conn match {
-      case c: HttpsURLConnection => c.getResponseCode()
-      case c: HttpURLConnection => c.getResponseCode()
-    }
-    
-    val is = try conn.getInputStream() catch {
-      case e: IOException => conn match {
-        case c: HttpsURLConnection => c.getErrorStream()
-        case c: HttpURLConnection => c.getErrorStream()
+      // FIXME: This will produce a race condition if creating multiple URL connections with
+      // different values for followRedirects in parallel
+      HttpURLConnection.setFollowRedirects(followRedirects)
+      val conn: URLConnection = new URL(toString).openConnection()
+      conn.setConnectTimeout(implicitly[TimeSystem.ByDuration[T]].fromDuration(timeoutValue).toInt)
+      conn match {
+        case c: HttpsURLConnection =>
+          if(ignoreInvalidCertificates) {
+            c.setSSLSocketFactory(sslContext.getSocketFactory)
+            c.setHostnameVerifier(allHostsValid)
+          }
+          c.setRequestMethod(method)
+          if(content != None) c.setDoOutput(true)
+          c.setUseCaches(false)
+        case c: HttpURLConnection =>
+          c.setRequestMethod(method)
+          if(content != None) c.setDoOutput(true)
+          c.setUseCaches(false)
       }
+
+      if(authenticate.isDefined) conn.setRequestProperty("Authorization",
+          "Basic "+base64.encode((authenticate.get._1+":"+
+          authenticate.get._2).getBytes("UTF-8")).mkString)
+
+      ?[PostType[C]].contentType map { ct =>
+        conn.setRequestProperty("Content-Type", ct.name)
+      }
+      for((k, v) <- httpHeaders) conn.setRequestProperty(k, v)
+
+      if(content != None)
+        ensuring(OutputStreamBuilder.output(conn.getOutputStream)) { out =>
+          ?[PostType[C]].sender(content) > out
+        } (_.close())
+
+      import scala.collection.JavaConversions._
+
+      val statusCode = conn match {
+        case c: HttpsURLConnection => c.getResponseCode()
+        case c: HttpURLConnection => c.getResponseCode()
+      }
+      
+      val is = try conn.getInputStream() catch {
+        case e: IOException => conn match {
+          case c: HttpsURLConnection => c.getErrorStream()
+          case c: HttpURLConnection => c.getErrorStream()
+        }
+      }
+      
+      new HttpResponse(mapAsScalaMap(conn.getHeaderFields()).toMap.mapValues(_.to[List]),
+          statusCode, is)
     }
-    new HttpResponse(mapAsScalaMap(conn.getHeaderFields()).toMap.mapValues(_.to[List]),
-        statusCode, is)
-  }
 }
 
 class HttpQueryParametersBase[U, T <: Iterable[U]] extends QueryType[Path[_], T] {
