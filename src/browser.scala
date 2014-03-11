@@ -44,7 +44,7 @@ class Browser[I: TimeSystem.ByInstant]() {
 
   def parseCookie(s: String, domain: String): Cookie[I, _] = {
     val ps = s.split(";").map(_.trim.split("=")) map { a =>
-      a(0).toLowerCase -> (if(a.length > 1) a(1).urlDecode else "")
+      a(0) -> (if(a.length > 1) a(1).urlDecode else "")
     }
     val details = ps.tail.toMap
 
