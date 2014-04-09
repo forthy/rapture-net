@@ -41,6 +41,15 @@ package object net {
       existing + ('#' -> (q.name -> 2.0))
   }
 
+  implicit val httpUrlSizable: Sizable[HttpUrl] = new Sizable[HttpUrl] {
+    type ExceptionType = HttpExceptions
+    def size(url: HttpUrl)(implicit eh: ExceptionHandler): eh.![Long, ExceptionType] = {
+      implicit val ts = timeSystems.numeric
+      url.size(10000L)(eh, ts)
+    }
+      
+  }
+
   implicit val httpUrlLinkable: Linkable[HttpUrl, HttpUrl] = new Linkable[HttpUrl, HttpUrl] {
     type Result = Link
     def link(src: HttpUrl, dest: HttpUrl) = {

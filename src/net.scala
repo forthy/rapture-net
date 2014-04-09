@@ -128,6 +128,18 @@ trait NetUrl extends Url[NetUrl] with Uri {
         followRedirects)(?[PostType[C]], eh, ts)
   }
 
+  def head[T](timeout: T = null,
+    authenticate: Option[(String, String)] = None,
+    ignoreInvalidCertificates: Boolean = false,
+    httpHeaders: Map[String, String] = Map(),
+    followRedirects: Boolean = true)
+  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+    val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
+    
+    post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "HEAD",
+        followRedirects)(?[PostType[None.type]], eh, ts)
+  }
+
   def get[T](
     timeout: T = null,
     authenticate: Option[(String, String)] = None,
@@ -141,7 +153,11 @@ trait NetUrl extends Url[NetUrl] with Uri {
     post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "GET",
         followRedirects)(?[PostType[None.type]], eh, ts)
   }
-      
+
+  def size[T](timeout: T = null)(implicit eh: ExceptionHandler, ts: TimeSystem[_, T]):
+      eh.![Long, HttpExceptions] = eh.wrap {
+    head(timeout)(raw, ts).headers.get("Content-Length").get.head.toLong
+  }
 
   /** Sends an HTTP post to this URL.
     *
@@ -295,4 +311,7 @@ object Https extends Scheme[HttpUrl] {
     * @param port The port to connect to this URL on, defaulting to port 443 */
   def /(hostname: String, port: Int = Services.Tcp.https.portNo) =
     new HttpPathRoot(hostname, port, true)
+  
+  def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
+    Http.parse(s)(eh)
 }
