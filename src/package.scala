@@ -43,9 +43,9 @@ package object net {
 
   implicit val httpUrlSizable: Sizable[HttpUrl] = new Sizable[HttpUrl] {
     type ExceptionType = HttpExceptions
-    def size(url: HttpUrl)(implicit eh: ExceptionHandler): eh.![Long, ExceptionType] = {
+    def size(url: HttpUrl): Long = {
       implicit val ts = timeSystems.numeric
-      url.size(10000L)(eh, ts)
+      url.size(10000L)(raw, ts)
     }
       
   }
