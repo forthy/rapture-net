@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/propensive/rapture-net.png?branch=master)](https://travis-ci.org/propensive/rapture-net)
+[![Build Status](https://travis-ci.org/propensive/rapture-net.png?branch=scala-2.10)](https://travis-ci.org/propensive/rapture-net)
 
 # Rapture Net
 
