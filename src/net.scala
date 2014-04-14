@@ -258,12 +258,19 @@ class HttpUrl(val pathRoot: NetPathRoot[HttpUrl], elements: Seq[String], afterPa
   }
 
   override def hashCode =
-    pathRoot.hashCode & elements.to[List].hashCode & afterPath.hashCode & ssl.hashCode
+    pathRoot.hashCode ^ elements.to[List].hashCode ^ afterPath.hashCode ^ ssl.hashCode
 }
 
 trait NetPathRoot[+T <: Url[T] with NetUrl] extends PathRoot[T] {
   def hostname: String
   def port: Int
+
+  override def equals(that: Any) = that match {
+    case that: NetPathRoot[_] => hostname == that.hostname && port == that.port
+    case _ => false
+  }
+
+  override def hashCode = hostname.hashCode ^ port
 }
 
 class HttpPathRoot(val hostname: String, val port: Int, val ssl: Boolean) extends
