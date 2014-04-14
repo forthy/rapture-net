@@ -249,6 +249,16 @@ class HttpUrl(val pathRoot: NetPathRoot[HttpUrl], elements: Seq[String], afterPa
   def hostname = pathRoot.hostname
   def port = pathRoot.port
   def canonicalPort = if(ssl) 443 else 80
+
+  override def equals(that: Any) = that match {
+    case that: HttpUrl =>
+      pathRoot == that.pathRoot && ssl == that.ssl && afterPath == that.afterPath &&
+          elements == that.elements
+    case _ => false
+  }
+
+  override def hashCode =
+    pathRoot.hashCode & elements.to[List].hashCode & afterPath.hashCode & ssl.hashCode
 }
 
 trait NetPathRoot[+T <: Url[T] with NetUrl] extends PathRoot[T] {
@@ -285,16 +295,24 @@ object Http extends Scheme[HttpUrl] {
   def /(hostname: String, port: Int = Services.Tcp.http.portNo) =
     new HttpPathRoot(hostname, port, false)
 
-  private val UrlRegex = """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?\/?(.*)""".r
+  private val UrlRegex = """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?(\/([^\?]*)\?(.*))?""".r
 
   /** Parses a URL string into an HttpUrl */
   def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
       eh.wrap { s match {
-    case UrlRegex(scheme, server, port, path) =>
+    case UrlRegex(scheme, server, port, _, path, after) =>
       val rp = new SimplePath(path.split("/"), Map())
+      val afterPath = after match {
+        case "" => Map[Symbol, String]()
+        case after => after.split("&").map { p => p.split("=", 2) match {
+          case Array(k, v) => Symbol(k) -> v
+        } }.toMap
+      }
       scheme match {
-        case "http" => Http./(server, if(port == null) 80 else port.substring(1).toInt) / rp
-        case "https" => Https./(server, if(port == null) 443 else port.substring(1).toInt) / rp
+        case "http" =>
+          Http./(server, if(port == null) 80 else port.substring(1).toInt) / rp /? afterPath
+        case "https" =>
+          Https./(server, if(port == null) 443 else port.substring(1).toInt) / rp /? afterPath
         case _ => throw ParseException(s)
       }
     case _ => throw ParseException(s)
