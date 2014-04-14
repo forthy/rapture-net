@@ -23,7 +23,6 @@ import rapture.core._
 import rapture.io._
 import rapture.uri._
 
-import scala.xml._
 import scala.collection.mutable.HashMap
 import java.text.SimpleDateFormat
 import java.util.Locale
