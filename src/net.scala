@@ -154,7 +154,7 @@ trait NetUrl extends Url[NetUrl] with Uri {
         followRedirects)(?[PostType[None.type]], eh, ts)
   }
 
-  def size[T](timeout: T = null)(implicit eh: ExceptionHandler, ts: TimeSystem[_, T]):
+  def size[T](timeout: T = null.asInstanceOf[T])(implicit eh: ExceptionHandler, ts: TimeSystem[_, T]):
       eh.![Long, HttpExceptions] = eh.wrap {
     head(timeout)(raw, ts).headers.get("Content-Length").get.head.toLong
   }
