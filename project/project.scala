@@ -1,5 +1,5 @@
 object project extends ProjectSettings {
-  def scalaVersion = "2.11.0-RC4"
+  def scalaVersion = "2.11.0"
   def version = "0.9.0"
   def name = "net"
   def description = "Rapture Net is a library for Rapture IO for working with networked resources"
