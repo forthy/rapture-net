@@ -91,7 +91,7 @@ package object net {
       new StreamReader[HttpResponse, Char] {
     def input(response: HttpResponse)(implicit eh: ExceptionHandler):
         eh.![Input[Char], Exception] = eh.wrap {
-      implicit val enc = Encodings.`UTF-8`
+      implicit val enc = encodings.`UTF-8`
       implicit val errorHandler = raw
       response.input[Char]
     }
