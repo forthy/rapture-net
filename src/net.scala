@@ -302,12 +302,13 @@ object Http extends Scheme[HttpUrl] {
   def /(hostname: String, port: Int = Services.Tcp.http.portNo) =
     new HttpPathRoot(hostname, port, false)
 
-  private val UrlRegex = """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?(\/([^\?]*)\?(.*))?""".r
+  private val UrlRegex =
+    """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?(\/?([^\?]*)(\?([^\?]*))?)""".r
 
   /** Parses a URL string into an HttpUrl */
   def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
       eh.wrap { s match {
-    case UrlRegex(scheme, server, port, _, path, after) =>
+    case UrlRegex(scheme, server, port, _, path, _, after) =>
       val rp = new SimplePath(path.split("/"), Map())
       val afterPath = after match {
         case "" => Map[Symbol, String]()
