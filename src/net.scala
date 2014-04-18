@@ -323,7 +323,7 @@ object Http extends Scheme[HttpUrl] {
           Https./(server, if(port == null) 443 else port.substring(1).toInt) / rp
         case _ => throw ParseException(s)
       }
-      if(afterPath.isEmpty) most else most /? afterPath
+      if(afterPath.isEmpty) most else most.query(afterPath)
     case _ => throw ParseException(s)
   } }
 }
