@@ -311,18 +311,19 @@ object Http extends Scheme[HttpUrl] {
     case UrlRegex(scheme, server, port, _, path, _, after) =>
       val rp = new SimplePath(path.split("/"), Map())
       val afterPath = after match {
-        case "" => Map[Symbol, String]()
+        case null | "" => Map[Symbol, String]()
         case after => after.split("&").map { p => p.split("=", 2) match {
           case Array(k, v) => Symbol(k) -> v
         } }.toMap
       }
-      scheme match {
+      val most = scheme match {
         case "http" =>
-          Http./(server, if(port == null) 80 else port.substring(1).toInt) / rp /? afterPath
+          Http./(server, if(port == null) 80 else port.substring(1).toInt) / rp
         case "https" =>
-          Https./(server, if(port == null) 443 else port.substring(1).toInt) / rp /? afterPath
+          Https./(server, if(port == null) 443 else port.substring(1).toInt) / rp
         case _ => throw ParseException(s)
       }
+      if(afterPath.isEmpty) most else most /? afterPath
     case _ => throw ParseException(s)
   } }
 }
