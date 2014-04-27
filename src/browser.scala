@@ -81,8 +81,8 @@ class Browser[I: TimeSystem.ByInstant]() {
       content: C, timeout: D = null,
       authenticate: Option[(String, String)] = None,
       httpHeaders: Map[String, String] = Map())
-    (implicit eh: ExceptionHandler, ts: TimeSystem[I, D]): eh.![HttpResponse, HttpExceptions] =
-      eh.wrap {
+    (implicit rts: Rts, ts: TimeSystem[I, D]): rts.Wrap[HttpResponse, HttpExceptions] =
+      rts.wrap {
         
         var u = url
         var retries = 0

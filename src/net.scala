@@ -60,9 +60,9 @@ object HttpMethods {
 }
 
 class HttpResponse(val headers: Map[String, List[String]], val status: Int, is: InputStream) {
-  def input[Data](implicit ib: InputBuilder[InputStream, Data], eh: ExceptionHandler):
-      eh.![Input[Data], Exception]=
-    eh.wrap(ib.input(is)(raw))
+  def input[Data](implicit ib: InputBuilder[InputStream, Data], rts: Rts):
+      rts.Wrap[Input[Data], Exception]=
+    rts.wrap(ib.input(is)(raw))
 }
 
 trait PostType[-C] {
@@ -120,12 +120,12 @@ trait NetUrl extends Url[NetUrl] with Uri {
     ignoreInvalidCertificates: Boolean = false,
     httpHeaders: Map[String, String] = Map(),
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+  (implicit rts: Rts, ts: TimeSystem[_, T]): rts.Wrap[HttpResponse, HttpExceptions] = {
     
     val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
     
     post(content, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "PUT",
-        followRedirects)(?[PostType[C]], eh, ts)
+        followRedirects)(?[PostType[C]], rts, ts)
   }
 
   def head[T](timeout: T = null,
@@ -133,11 +133,11 @@ trait NetUrl extends Url[NetUrl] with Uri {
     ignoreInvalidCertificates: Boolean = false,
     httpHeaders: Map[String, String] = Map(),
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+  (implicit rts: Rts, ts: TimeSystem[_, T]): rts.Wrap[HttpResponse, HttpExceptions] = {
     val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
     
     post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "HEAD",
-        followRedirects)(?[PostType[None.type]], eh, ts)
+        followRedirects)(?[PostType[None.type]], rts, ts)
   }
 
   def get[T](
@@ -146,16 +146,16 @@ trait NetUrl extends Url[NetUrl] with Uri {
     ignoreInvalidCertificates: Boolean = false,
     httpHeaders: Map[String, String] = Map(),
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+  (implicit rts: Rts, ts: TimeSystem[_, T]): rts.Wrap[HttpResponse, HttpExceptions] = {
 
     val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
     
     post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "GET",
-        followRedirects)(?[PostType[None.type]], eh, ts)
+        followRedirects)(?[PostType[None.type]], rts, ts)
   }
 
-  def size[T](timeout: T = null.asInstanceOf[T])(implicit eh: ExceptionHandler, ts: TimeSystem[_, T]):
-      eh.![Long, HttpExceptions] = eh.wrap {
+  def size[T](timeout: T = null.asInstanceOf[T])(implicit rts: Rts, ts: TimeSystem[_, T]):
+      rts.Wrap[Long, HttpExceptions] = rts.wrap {
     head(timeout)(raw, ts).headers.get("Content-Length").get.head.toLong
   }
 
@@ -173,8 +173,8 @@ trait NetUrl extends Url[NetUrl] with Uri {
     httpHeaders: Map[String, String] = Map(),
     method: String = "POST",
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] =
-    eh.wrap {
+  (implicit rts: Rts, ts: TimeSystem[_, T]): rts.Wrap[HttpResponse, HttpExceptions] =
+    rts wrap {
       val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
       implicit val errorHandler = raw
 
@@ -306,8 +306,8 @@ object Http extends Scheme[HttpUrl] {
     """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?(\/?([^\?]*)(\?([^\?]*))?)""".r
 
   /** Parses a URL string into an HttpUrl */
-  def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
-      eh.wrap { s match {
+  def parse(s: String)(implicit rts: Rts): rts.Wrap[HttpUrl, ParseException] =
+      rts.wrap { s match {
     case UrlRegex(scheme, server, port, _, path, _, after) =>
       val rp = new SimplePath(path.split("/"), Map())
       val afterPath = after match {
@@ -339,6 +339,6 @@ object Https extends Scheme[HttpUrl] {
   def /(hostname: String, port: Int = Services.Tcp.https.portNo) =
     new HttpPathRoot(hostname, port, true)
   
-  def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
-    Http.parse(s)(eh)
+  def parse(s: String)(implicit rts: Rts): rts.Wrap[HttpUrl, ParseException] =
+    Http.parse(s)(rts)
 }

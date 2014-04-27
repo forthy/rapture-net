@@ -89,8 +89,8 @@ package object net {
 
   implicit val httpResponseCharReader: StreamReader[HttpResponse, Char] =
       new StreamReader[HttpResponse, Char] {
-    def input(response: HttpResponse)(implicit eh: ExceptionHandler):
-        eh.![Input[Char], Exception] = eh.wrap {
+    def input(response: HttpResponse)(implicit rts: Rts):
+        rts.Wrap[Input[Char], Exception] = rts.wrap {
       implicit val enc = encodings.`UTF-8`
       implicit val errorHandler = raw
       response.input[Char]
@@ -99,9 +99,9 @@ package object net {
 
   implicit val httpResponseByteReader: StreamReader[HttpResponse, Byte] =
     new StreamReader[HttpResponse, Byte] {
-      def input(response: HttpResponse)(implicit eh: ExceptionHandler):
-          eh.![Input[Byte], Exception] =
-        eh.wrap(response.input[Byte](?[InputBuilder[InputStream, Byte]], raw))
+      def input(response: HttpResponse)(implicit rts: Rts):
+          rts.Wrap[Input[Byte], Exception] =
+        rts.wrap(response.input[Byte](?[InputBuilder[InputStream, Byte]], raw))
     }
 
   implicit val socketStreamByteReader: JavaInputStreamReader[SocketUri] =
