@@ -81,7 +81,7 @@ class Browser[I: TimeSystem.ByInstant]() {
       content: C, timeout: D = null,
       authenticate: Option[(String, String)] = None,
       httpHeaders: Map[String, String] = Map())
-    (implicit rts: Rts, ts: TimeSystem[I, D]): rts.Wrap[HttpResponse, HttpExceptions] =
+    (implicit rts: Rts[IoMethods], ts: TimeSystem[I, D]): rts.Wrap[HttpResponse, HttpExceptions] =
       rts.wrap {
         
         var u = url
