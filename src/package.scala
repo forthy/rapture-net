@@ -24,7 +24,7 @@ import rapture.uri._
 import rapture.mime._
 import rapture.core._
 
-import java.io._
+import java.io.{Reader => _, Writer => _, _}
 
 package object net {
   
@@ -87,21 +87,21 @@ package object net {
   implicit val httpStreamByteReader: JavaInputStreamReader[HttpUrl] =
       new JavaInputStreamReader[HttpUrl](_.javaConnection.getInputStream)
 
-  implicit val httpResponseCharReader: StreamReader[HttpResponse, Char] =
-      new StreamReader[HttpResponse, Char] {
-    def input(response: HttpResponse)(implicit rts: Rts[IoMethods]):
-        rts.Wrap[Input[Char], Exception] = rts.wrap {
+  implicit val httpResponseCharReader: Reader[HttpResponse, Char] =
+      new Reader[HttpResponse, Char] {
+    def input(response: HttpResponse)(implicit mode: Mode[IoMethods]):
+        mode.Wrap[Input[Char], Exception] = mode.wrap {
       implicit val enc = encodings.`UTF-8`
       implicit val errorHandler = raw
       response.input[Char]
     }
   }
 
-  implicit val httpResponseByteReader: StreamReader[HttpResponse, Byte] =
-    new StreamReader[HttpResponse, Byte] {
-      def input(response: HttpResponse)(implicit rts: Rts[IoMethods]):
-          rts.Wrap[Input[Byte], Exception] =
-        rts.wrap(response.input[Byte](?[InputBuilder[InputStream, Byte]], raw))
+  implicit val httpResponseByteReader: Reader[HttpResponse, Byte] =
+    new Reader[HttpResponse, Byte] {
+      def input(response: HttpResponse)(implicit mode: Mode[IoMethods]):
+          mode.Wrap[Input[Byte], Exception] =
+        mode.wrap(response.input[Byte](?[InputBuilder[InputStream, Byte]], raw))
     }
 
   implicit val socketStreamByteReader: JavaInputStreamReader[SocketUri] =

@@ -23,18 +23,18 @@ package rapture.net
 import rapture.core._
 import rapture.crypto._
 
-trait NetMethods extends RtsGroup
+trait NetMethods extends ModeGroup
 
 object Ipv6 {
-  def parse(s: String)(implicit rts: Rts[NetMethods]): rts.Wrap[Ipv6, ParseException] =
-    rts.wrap {
+  def parse(s: String)(implicit mode: Mode[NetMethods]): mode.Wrap[Ipv6, ParseException] =
+    mode.wrap {
       val groups: Array[String] = s.split("::").map(_.split(":")) match {
         case Array() => Array.fill(8)("")
         case Array(xs) => xs.padTo(8, "")
         case Array(Array(""), xs) => Array.fill(8 - xs.length)("") ++ xs
         case Array(xs, ys) => xs ++ Array.fill(8 - xs.length - ys.length)("") ++ ys
       }
-      val gs = groups map { v => Hex.decode(v)(raw).map(_ & 0xff) } map {
+      val gs = groups map { v => Hex.decode(v).map(_ & 0xff) } map {
         case Array() => 0
         case Array(le) => le
         case Array(be, le) => (be << 8) + le
