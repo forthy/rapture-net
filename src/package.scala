@@ -28,7 +28,7 @@ import rapture.codec._
 import java.io.{Reader => _, Writer => _, _}
 
 package object net {
-  
+
   type TcpService = Services.Tcp.Item
   
   implicit val httpQueryParametersMap: HttpQueryParametersBase[(Symbol, String), Map[Symbol,
@@ -46,7 +46,8 @@ package object net {
     type ExceptionType = HttpExceptions
     def size(url: HttpUrl): Long = {
       implicit val ts = timeSystems.numeric
-      url.size(10000L)(raw, ts)
+
+      url.head(10000L).headers.get("Content-Length").get.head.toLong
     }
       
   }

@@ -32,6 +32,8 @@ import language.existentials
 import java.io._
 import java.net._
 
+
+
 object HttpMethods {
   
   private val methods = new scala.collection.mutable.HashMap[String, Method]
@@ -154,11 +156,6 @@ trait NetUrl extends Url[NetUrl] with Uri {
     
     post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "GET",
         followRedirects)(?[PostType[None.type]], mode, ts)
-  }
-
-  def size[T](timeout: T = null.asInstanceOf[T])(implicit mode: Mode[IoMethods], ts: TimeSystem[_, T]):
-      mode.Wrap[Long, HttpExceptions] = mode.wrap {
-    head(timeout)(raw, ts).headers.get("Content-Length").get.head.toLong
   }
 
   /** Sends an HTTP post to this URL.
