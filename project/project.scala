@@ -6,6 +6,7 @@ object project extends ProjectSettings {
   
   def dependencies = Seq(
     "io" -> "0.10.0",
+    "codec" -> "0.10.0",
     "crypto" -> "0.10.0"
   )
   

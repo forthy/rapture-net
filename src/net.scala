@@ -25,6 +25,7 @@ import rapture.uri._
 import rapture.mime._
 import rapture.core._
 import rapture.crypto._
+import rapture.codec._
 
 import language.existentials
 
@@ -103,7 +104,8 @@ trait NetUrl extends Url[NetUrl] with Uri {
   def ssl: Boolean
   def canonicalPort: Int
 
-  private val base64 = new Base64Codec(endPadding = true)
+  trait Base64Padded extends CodecType
+  implicit val base64: ByteCodec[Base64Padded] = new Base64Codec[Base64Padded](endPadding = true)
 
   def schemeSpecificPart = "//"+hostname+(if(port == canonicalPort) "" else ":"+port)+pathString
 

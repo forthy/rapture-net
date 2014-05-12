@@ -23,6 +23,7 @@ import rapture.io._
 import rapture.uri._
 import rapture.mime._
 import rapture.core._
+import rapture.codec._
 
 import java.io.{Reader => _, Writer => _, _}
 

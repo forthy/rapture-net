@@ -22,6 +22,7 @@ package rapture.net
 
 import rapture.core._
 import rapture.crypto._
+import rapture.codec._
 
 trait NetMethods extends ModeGroup
 
@@ -34,7 +35,7 @@ object Ipv6 {
         case Array(Array(""), xs) => Array.fill(8 - xs.length)("") ++ xs
         case Array(xs, ys) => xs ++ Array.fill(8 - xs.length - ys.length)("") ++ ys
       }
-      val gs = groups map { v => Hex.decode(v).map(_ & 0xff) } map {
+      val gs = groups map (decode[Hex](_).bytes) map {
         case Array() => 0
         case Array(le) => le
         case Array(be, le) => (be << 8) + le
@@ -64,7 +65,7 @@ case class Ipv6(s1: Int, s2: Int, s3: Int, s4: Int, s5: Int, s6: Int, s7: Int, s
   def groups = Vector(s1, s2, s3, s4, s5, s6, s7, s8)
 
   def expanded = groups map { s =>
-    Hex.encode(Array(((s >> 8) & 0xff).toByte, (s & 0xff).toByte))
+    Bytes(Array(((s >> 8) & 0xff).toByte, (s & 0xff).toByte)).as[Hex]
   } mkString ":"
 
   override def toString = expanded.replaceAll("^0+", "").replaceAll(":0+", ":").replaceAll("::+", "::")
