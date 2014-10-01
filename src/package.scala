@@ -1,6 +1,6 @@
 /**********************************************************************************************\
 * Rapture Net Library                                                                          *
-* Version 0.9.0                                                                                *
+* Version 0.10.0                                                                               *
 *                                                                                              *
 * The primary distribution site is                                                             *
 *                                                                                              *
@@ -23,11 +23,12 @@ import rapture.io._
 import rapture.uri._
 import rapture.mime._
 import rapture.core._
+import rapture.codec._
 
-import java.io._
+import java.io.{Reader => _, Writer => _, _}
 
 package object net {
-  
+
   type TcpService = Services.Tcp.Item
   
   implicit val httpQueryParametersMap: HttpQueryParametersBase[(Symbol, String), Map[Symbol,
@@ -41,11 +42,12 @@ package object net {
       existing + ('#' -> (q.name -> 2.0))
   }
 
-  implicit val httpUrlSizable: Sizable[HttpUrl] = new Sizable[HttpUrl] {
+  implicit val httpUrlSizable: Sizable[HttpUrl, Byte] = new Sizable[HttpUrl, Byte] {
     type ExceptionType = HttpExceptions
     def size(url: HttpUrl): Long = {
       implicit val ts = timeSystems.numeric
-      url.size(10000L)(raw, ts)
+
+      url.head(10000L).headers.get("Content-Length").get.head.toLong
     }
       
   }
@@ -87,21 +89,21 @@ package object net {
   implicit val httpStreamByteReader: JavaInputStreamReader[HttpUrl] =
       new JavaInputStreamReader[HttpUrl](_.javaConnection.getInputStream)
 
-  implicit val httpResponseCharReader: StreamReader[HttpResponse, Char] =
-      new StreamReader[HttpResponse, Char] {
-    def input(response: HttpResponse)(implicit eh: ExceptionHandler):
-        eh.![Input[Char], Exception] = eh.wrap {
-      implicit val enc = Encodings.`UTF-8`
+  implicit val httpResponseCharReader: Reader[HttpResponse, Char] =
+      new Reader[HttpResponse, Char] {
+    def input(response: HttpResponse)(implicit mode: Mode[IoMethods]):
+        mode.Wrap[Input[Char], Exception] = mode.wrap {
+      implicit val enc = encodings.`UTF-8`
       implicit val errorHandler = raw
       response.input[Char]
     }
   }
 
-  implicit val httpResponseByteReader: StreamReader[HttpResponse, Byte] =
-    new StreamReader[HttpResponse, Byte] {
-      def input(response: HttpResponse)(implicit eh: ExceptionHandler):
-          eh.![Input[Byte], Exception] =
-        eh.wrap(response.input[Byte](?[InputBuilder[InputStream, Byte]], raw))
+  implicit val httpResponseByteReader: Reader[HttpResponse, Byte] =
+    new Reader[HttpResponse, Byte] {
+      def input(response: HttpResponse)(implicit mode: Mode[IoMethods]):
+          mode.Wrap[Input[Byte], Exception] =
+        mode.wrap(response.input[Byte](?[InputBuilder[InputStream, Byte]], raw))
     }
 
   implicit val socketStreamByteReader: JavaInputStreamReader[SocketUri] =

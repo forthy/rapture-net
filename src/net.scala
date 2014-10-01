@@ -1,6 +1,6 @@
 /**********************************************************************************************\
 * Rapture Net Library                                                                          *
-* Version 0.9.0                                                                                *
+* Version 0.10.0                                                                               *
 *                                                                                              *
 * The primary distribution site is                                                             *
 *                                                                                              *
@@ -25,11 +25,14 @@ import rapture.uri._
 import rapture.mime._
 import rapture.core._
 import rapture.crypto._
+import rapture.codec._
 
 import language.existentials
 
 import java.io._
 import java.net._
+
+
 
 object HttpMethods {
   
@@ -60,9 +63,9 @@ object HttpMethods {
 }
 
 class HttpResponse(val headers: Map[String, List[String]], val status: Int, is: InputStream) {
-  def input[Data](implicit ib: InputBuilder[InputStream, Data], eh: ExceptionHandler):
-      eh.![Input[Data], Exception]=
-    eh.wrap(ib.input(is)(raw))
+  def input[Data](implicit ib: InputBuilder[InputStream, Data], mode: Mode[IoMethods]):
+      mode.Wrap[Input[Data], Exception]=
+    mode.wrap(ib.input(is)(raw))
 }
 
 trait PostType[-C] {
@@ -103,7 +106,8 @@ trait NetUrl extends Url[NetUrl] with Uri {
   def ssl: Boolean
   def canonicalPort: Int
 
-  private val base64 = new Base64Codec(endPadding = true)
+  trait Base64Padded extends CodecType
+  implicit val base64: ByteCodec[Base64Padded] = new Base64Codec[Base64Padded](endPadding = true)
 
   def schemeSpecificPart = "//"+hostname+(if(port == canonicalPort) "" else ":"+port)+pathString
 
@@ -120,12 +124,12 @@ trait NetUrl extends Url[NetUrl] with Uri {
     ignoreInvalidCertificates: Boolean = false,
     httpHeaders: Map[String, String] = Map(),
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+  (implicit mode: Mode[IoMethods], ts: TimeSystem[_, T]): mode.Wrap[HttpResponse, HttpExceptions] = {
     
     val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
     
     post(content, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "PUT",
-        followRedirects)(?[PostType[C]], eh, ts)
+        followRedirects)(?[PostType[C]], mode, ts)
   }
 
   def head[T](timeout: T = null,
@@ -133,11 +137,11 @@ trait NetUrl extends Url[NetUrl] with Uri {
     ignoreInvalidCertificates: Boolean = false,
     httpHeaders: Map[String, String] = Map(),
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+  (implicit mode: Mode[IoMethods], ts: TimeSystem[_, T]): mode.Wrap[HttpResponse, HttpExceptions] = {
     val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
     
     post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "HEAD",
-        followRedirects)(?[PostType[None.type]], eh, ts)
+        followRedirects)(?[PostType[None.type]], mode, ts)
   }
 
   def get[T](
@@ -146,17 +150,12 @@ trait NetUrl extends Url[NetUrl] with Uri {
     ignoreInvalidCertificates: Boolean = false,
     httpHeaders: Map[String, String] = Map(),
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] = {
+  (implicit mode: Mode[IoMethods], ts: TimeSystem[_, T]): mode.Wrap[HttpResponse, HttpExceptions] = {
 
     val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
     
     post(None, timeoutValue, authenticate, ignoreInvalidCertificates, httpHeaders, "GET",
-        followRedirects)(?[PostType[None.type]], eh, ts)
-  }
-
-  def size[T](timeout: T = null)(implicit eh: ExceptionHandler, ts: TimeSystem[_, T]):
-      eh.![Long, HttpExceptions] = eh.wrap {
-    head(timeout)(raw, ts).headers.get("Content-Length").get.head.toLong
+        followRedirects)(?[PostType[None.type]], mode, ts)
   }
 
   /** Sends an HTTP post to this URL.
@@ -173,8 +172,8 @@ trait NetUrl extends Url[NetUrl] with Uri {
     httpHeaders: Map[String, String] = Map(),
     method: String = "POST",
     followRedirects: Boolean = true)
-  (implicit eh: ExceptionHandler, ts: TimeSystem[_, T]): eh.![HttpResponse, HttpExceptions] =
-    eh.wrap {
+  (implicit mode: Mode[IoMethods], ts: TimeSystem[_, T]): mode.Wrap[HttpResponse, HttpExceptions] =
+    mode wrap {
       val timeoutValue = Option(timeout).getOrElse(?[TimeSystem[_, T]].duration(0L, 10000L))
       implicit val errorHandler = raw
 
@@ -249,11 +248,28 @@ class HttpUrl(val pathRoot: NetPathRoot[HttpUrl], elements: Seq[String], afterPa
   def hostname = pathRoot.hostname
   def port = pathRoot.port
   def canonicalPort = if(ssl) 443 else 80
+
+  override def equals(that: Any) = that match {
+    case that: HttpUrl =>
+      pathRoot == that.pathRoot && ssl == that.ssl && afterPath == that.afterPath &&
+          elements == that.elements
+    case _ => false
+  }
+
+  override def hashCode =
+    pathRoot.hashCode ^ elements.to[List].hashCode ^ afterPath.hashCode ^ ssl.hashCode
 }
 
 trait NetPathRoot[+T <: Url[T] with NetUrl] extends PathRoot[T] {
   def hostname: String
   def port: Int
+
+  override def equals(that: Any) = that match {
+    case that: NetPathRoot[_] => hostname == that.hostname && port == that.port
+    case _ => false
+  }
+
+  override def hashCode = hostname.hashCode ^ port
 }
 
 class HttpPathRoot(val hostname: String, val port: Int, val ssl: Boolean) extends
@@ -285,18 +301,28 @@ object Http extends Scheme[HttpUrl] {
   def /(hostname: String, port: Int = Services.Tcp.http.portNo) =
     new HttpPathRoot(hostname, port, false)
 
-  private val UrlRegex = """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?\/?(.*)""".r
+  private val UrlRegex =
+    """(https?):\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?(\/?([^\?]*)(\?([^\?]*))?)""".r
 
   /** Parses a URL string into an HttpUrl */
-  def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
-      eh.wrap { s match {
-    case UrlRegex(scheme, server, port, path) =>
+  def parse(s: String)(implicit mode: Mode[IoMethods]): mode.Wrap[HttpUrl, ParseException] =
+      mode.wrap { s match {
+    case UrlRegex(scheme, server, port, _, path, _, after) =>
       val rp = new SimplePath(path.split("/"), Map())
-      scheme match {
-        case "http" => Http./(server, if(port == null) 80 else port.substring(1).toInt) / rp
-        case "https" => Https./(server, if(port == null) 443 else port.substring(1).toInt) / rp
+      val afterPath = after match {
+        case null | "" => Map[Symbol, String]()
+        case after => after.split("&").map { p => p.split("=", 2) match {
+          case Array(k, v) => Symbol(k) -> v
+        } }.toMap
+      }
+      val most = scheme match {
+        case "http" =>
+          Http./(server, if(port == null) 80 else port.substring(1).toInt) / rp
+        case "https" =>
+          Https./(server, if(port == null) 443 else port.substring(1).toInt) / rp
         case _ => throw ParseException(s)
       }
+      if(afterPath.isEmpty) most else most.query(afterPath)
     case _ => throw ParseException(s)
   } }
 }
@@ -312,6 +338,6 @@ object Https extends Scheme[HttpUrl] {
   def /(hostname: String, port: Int = Services.Tcp.https.portNo) =
     new HttpPathRoot(hostname, port, true)
   
-  def parse(s: String)(implicit eh: ExceptionHandler): eh.![HttpUrl, ParseException] =
-    Http.parse(s)(eh)
+  def parse(s: String)(implicit mode: Mode[IoMethods]): mode.Wrap[HttpUrl, ParseException] =
+    Http.parse(s)(mode)
 }

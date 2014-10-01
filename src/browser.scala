@@ -1,6 +1,6 @@
 /**********************************************************************************************\
 * Rapture Net Library                                                                          *
-* Version 0.9.0                                                                                *
+* Version 0.10.0                                                                               *
 *                                                                                              *
 * The primary distribution site is                                                             *
 *                                                                                              *
@@ -81,8 +81,8 @@ class Browser[I: TimeSystem.ByInstant]() {
       content: C, timeout: D = null,
       authenticate: Option[(String, String)] = None,
       httpHeaders: Map[String, String] = Map())
-    (implicit eh: ExceptionHandler, ts: TimeSystem[I, D]): eh.![HttpResponse, HttpExceptions] =
-      eh.wrap {
+    (implicit mode: Mode[IoMethods], ts: TimeSystem[I, D]): mode.Wrap[HttpResponse, HttpExceptions] =
+      mode.wrap {
         
         var u = url
         var retries = 0
