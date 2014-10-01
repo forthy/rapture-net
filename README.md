@@ -10,14 +10,14 @@ Rapture Net is *managed*. This means that the API is expected to continue to evo
 
 ### Availability
 
-Rapture Net 0.9.0 is available under the Apache 2.0 License from Maven Central with group ID `com.propensive` and artifact ID `rapture-net_2.10`.
+Rapture Net 0.10.0 is available under the Apache 2.0 License from Maven Central with group ID `com.propensive` and artifact ID `rapture-net_2.10`.
 
 #### SBT
 
 You can include Rapture Net as a dependency in your own project by adding the following library dependency to your build file:
 
 ```scala
-libraryDependencies ++= Seq("com.propensive" %% "rapture-net" % "0.9.0")
+libraryDependencies ++= Seq("com.propensive" %% "rapture-net" % "0.10.0")
 ```
 
 #### Maven
@@ -28,7 +28,7 @@ If you use Maven, include the following dependency:
 <dependency>
   <groupId>com.propensive</groupId>
   <artifactId>rapture-net_2.10</artifactId>
-  <version>0.9.0<version>
+  <version>0.10.0<version>
 </dependency>
 ```
 
