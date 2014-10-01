@@ -1,6 +1,6 @@
 /**********************************************************************************************\
 * Rapture Net Library                                                                          *
-* Version 0.9.0                                                                                *
+* Version 0.10.0                                                                               *
 *                                                                                              *
 * The primary distribution site is                                                             *
 *                                                                                              *
@@ -32,8 +32,8 @@ object Tcp {
     * @usecase def listen(port: Int): Input[Byte]
     * @param port the port to listen to */
   def listen[K](port: Int)(implicit ib: InputBuilder[InputStream, K],
-      ob: OutputBuilder[OutputStream, K], eh: ExceptionHandler):
-      eh.![(Input[K], Output[K]), Exception] = eh.wrap {
+      ob: OutputBuilder[OutputStream, K], mode: Mode[IoMethods]):
+      mode.Wrap[(Input[K], Output[K]), Exception] = mode.wrap {
     val sock = new java.net.ServerSocket(port)
     val sock2 = sock.accept()
     (ib.input(sock2.getInputStream)(raw), ob.output(sock2.getOutputStream)(raw))
