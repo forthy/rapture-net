@@ -6,11 +6,12 @@ object project extends ProjectSettings {
   
   def dependencies = Seq(
     "io" -> "0.10.0",
-    "codec" -> "0.10.0",
     "crypto" -> "0.10.0"
   )
   
-  def thirdPartyDependencies = Nil
+  def thirdPartyDependencies = Seq(
+    ("commons-net", "commons-net", "2.0")
+  )
 
   def imports = Seq(
     "rapture.core._",

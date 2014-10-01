@@ -42,7 +42,7 @@ package object net {
       existing + ('#' -> (q.name -> 2.0))
   }
 
-  implicit val httpUrlSizable: Sizable[HttpUrl] = new Sizable[HttpUrl] {
+  implicit val httpUrlSizable: Sizable[HttpUrl, Byte] = new Sizable[HttpUrl, Byte] {
     type ExceptionType = HttpExceptions
     def size(url: HttpUrl): Long = {
       implicit val ts = timeSystems.numeric

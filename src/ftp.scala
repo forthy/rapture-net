@@ -22,16 +22,93 @@ package rapture.net
 import rapture.core._
 import rapture.io._
 import rapture.uri._
+import scala.collection.mutable.{HashMap, Queue}
 
-object Ftp extends Scheme[FtpUrl] {
-  def schemeName = "ftp"
-  def /(hostname: String, username: String = null, password: String = null, port: Int = 25) = {
-    new FtpPathRoot(hostname, Option(username), Option(password), port)
+import org.apache.commons.net.ftp._
+
+abstract class ConnectionPool[Resource, Key] {
+
+  private val resources: HashMap[Key, Queue[Resource]] =
+    new HashMap[Key, Queue[Resource]]()
+
+  protected def make(key: Key): Resource
+  protected def dispose(resource: Resource): Unit
+  protected def check(resource: Resource): Boolean
+  protected def spare = 1
+  protected def timeout = 10*60000L
+  
+  def acquire(key: Key): Resource = synchronized {
+    if(resources.getOrElseUpdate(key, new Queue[Resource]).length == 0) make(key)
+    else {
+      val r = resources(key).dequeue
+      if(check(r)) r else {
+        dispose(r)
+        make(key)
+      }
+    }
+  }
+
+  val lastLow: HashMap[Key, Long] = new HashMap[Key, Long]()
+
+  def release(key: Key, resource: Resource): Unit = synchronized {
+    val now = System.currentTimeMillis()
+    if(resources(key).size < spare) lastLow(key) = now
+    if(lastLow(key) > now - timeout) resources(key).enqueue(resource)
+    else dispose(resource)
+  }
+
+  def using[Result](key: Key)(fn: Resource => Result): Result = {
+    val res = acquire(key)
+    try fn(res) finally release(key, res)
   }
 }
 
-class FtpPathRoot(val hostname: String, val username: Option[String],
-    val password: Option[String], val port: Int) extends NetPathRoot[FtpUrl] { thisPathRoot =>
+case class ConnectionDetails(username: String, password: String, passive: Boolean, hostname: String)
+
+object FtpConnectionPool extends ConnectionPool[FTPClient, ConnectionDetails] {
+  
+  def dispose(client: FTPClient) = ()
+
+  def check(client: FTPClient) = true
+  
+  def make(k: ConnectionDetails): FTPClient = {
+    val ftp = new FTPClient()
+    val config = new FTPClientConfig()
+    ftp.configure(config)
+    ftp.login(k.username, k.password)
+    if(k.passive) ftp.enterLocalPassiveMode()
+    ftp.setFileType(FTP.BINARY_FILE_TYPE)
+    ftp
+  }
+}
+
+case class FtpCredentials(username: String, password: String = null)
+
+object Ftp extends Scheme[FtpUrl] {
+  def schemeName = "ftp"
+  def /(hostname: String, port: Int = 25) = new FtpPathRoot(hostname, port)
+
+  private val FtpRegex =
+    """ftp:\/\/([\.\-a-z0-9]+)(:[1-9][0-9]*)?\/(.*)""".r
+
+  def parse(s: String)(implicit mode: Mode[IoMethods]): mode.Wrap[FtpUrl, ParseException] =
+    mode.wrap { s match {
+      case FtpRegex(server, port, path) =>
+        new FtpPathRoot(server, Option(port).map(_.substring(1).toInt).getOrElse(25)).makePath(0, path.split("/"), Map())
+    } }
+
+  def connect[C, T]()(fn: C => T)(implicit ftp: FtpSystem[C]) = {
+    val conn = ftp.newConnection()
+    fn(conn)
+  }
+}
+
+trait FtpSystem[Connection] {
+  def newConnection(): Connection
+  def input(conn: Connection, path: String): java.io.InputStream
+}
+
+class FtpPathRoot(val hostname: String, val port: Int) extends NetPathRoot[FtpUrl] { thisPathRoot =>
   def scheme = Ftp
  
   def makePath(ascent: Int, elements: Seq[String], afterPath: AfterPath) =
@@ -43,8 +120,15 @@ class FtpPathRoot(val hostname: String, val username: Option[String],
     that.isInstanceOf[FtpPathRoot] && hostname == that.asInstanceOf[FtpPathRoot].hostname
 }
 
-class FtpUrl(val pathRoot: NetPathRoot[FtpUrl], val elems: Seq[String]) extends
-    Url[FtpUrl](elems, Map()) with NetUrl {
+object FtpUrl {
+  implicit def reader[C](implicit cred: FtpCredentials, ftp: FtpSystem[C]): Reader[FtpUrl, Byte] =
+    new JavaInputStreamReader[FtpUrl]({ ftpUrl =>
+      ftp.input(ftp.newConnection(), ftpUrl.path.mkString("/", "/", ""))
+    })
+}
+
+class FtpUrl(val pathRoot: NetPathRoot[FtpUrl], val path: Seq[String]) extends
+    Url[FtpUrl](path, Map()) with NetUrl {
   def makePath(ascent: Int, xs: Seq[String], afterPath: AfterPath) =
     new FtpUrl(pathRoot, elements)
 
